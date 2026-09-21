@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Demo E-Menu Cafe</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome untuk ikon -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: '#8B5A2B', // Warna dominan tema kopi
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Menyembunyikan scrollbar agar tampilan mobile lebih rapi */
+        ::-webkit-scrollbar { display: none; }
+    </style>
+</head>
+<body class="bg-gray-50 pb-24 font-sans text-gray-800">
+    
+    <!-- Navbar / Header -->
+    <header class="bg-brand text-white p-4 sticky top-0 z-50 shadow-md flex justify-between items-center">
+        <div>
+            <h1 class="text-xl font-bold">Demo Cafe Menu</h1>
+            <p class="text-xs text-brand-200">Pesan langsung dari meja</p>
+        </div>
+        <div class="relative cursor-pointer" onclick="toggleCart()">
+            <i class="fas fa-shopping-cart text-2xl"></i>
+            <span id="cart-badge" class="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full hidden">0</span>
+        </div>
+    </header>
+
+    <!-- Input Nomor Meja -->
+    <div class="p-4 bg-white shadow-sm mb-4">
+        <label class="block text-sm font-semibold mb-2 text-gray-700">Nomor Meja:</label>
+        <input type="number" id="nomor-meja" placeholder="Contoh: 4" class="w-full border border-gray-300 p-2 rounded focus:outline-none focus:ring-2 focus:ring-brand">
+    </div>
+
+    <!-- Container Katalog Produk -->
+    <main class="p-4 grid grid-cols-2 gap-4" id="menu-container">
+        <!-- Item akan di-render oleh JavaScript -->
+    </main>
+
+    <!-- Modal Keranjang Belanja -->
+    <div id="cart-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex-col justify-end transition-opacity">
+        <div class="bg-white rounded-t-2xl p-4 max-h-[80vh] overflow-y-auto w-full max-w-md mx-auto relative shadow-2xl">
+            <button onclick="toggleCart()" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600">
+                <i class="fas fa-times text-xl"></i>
+            </button>
+            <h2 class="text-xl font-bold mb-4 border-b pb-2">Pesanan Anda</h2>
+            <div id="cart-items" class="mb-4 min-h-[100px]">
+                <!-- Item keranjang muncul di sini -->
+            </div>
+            <div class="flex justify-between font-bold text-lg mb-4 border-t pt-3">
+                <span>Total</span>
+                <span id="cart-total" class="text-brand">Rp 0</span>
+            </div>
+            <button onclick="checkoutWA()" class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 rounded-lg flex items-center justify-center gap-2 transition-colors">
+                <i class="fab fa-whatsapp text-xl"></i> Kirim Pesanan ke Kasir
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // Array Data Produk (Bisa diganti dengan data asli kafe nanti)
+        const products = [
+            { id: 1, name: "Ice Kopi Susu Aren", price: 20000, img: "https://images.unsplash.com/photo-1593443320739-77f74939d0da?ixlib=rb-1.2.1&auto=format&fit=crop&w=300&q=80" },
+            { id: 2, name: "Americano Dingin", price: 18000, img: "https://images.unsplash.com/photo-1517701604599-bb29b565090c?ixlib=rb-1.2.1&auto=format&fit=crop&w=300&q=80" },
+            { id: 3, name: "Matcha Latte", price: 25000, img: "https://images.unsplash.com/photo-1515823662972-da6a2e4d3002?ixlib=rb-1.2.1&auto=format&fit=crop&w=300&q=80" },
+            { id: 4, name: "Croissant Butter", price: 15000, img: "https://images.unsplash.com/photo-1549903072-7e6e0bedb7fb?ixlib=rb-1.2.1&auto=format&fit=crop&w=300&q=80" },
+            { id: 5, name: "Kentang Goreng", price: 15000, img: "https://images.unsplash.com/photo-1576107232684-1279f3908594?ixlib=rb-1.2.1&auto=format&fit=crop&w=300&q=80" }
+        ];
+
+        // Objek untuk menyimpan status keranjang
+        let cart = {};
+
+        // Helper: Format angka ke Rupiah
+        const formatRp = (angka) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka);
+
+        // Fungsi mencetak produk ke HTML
+        function renderMenu() {
+            const container = document.getElementById('menu-container');
+            container.innerHTML = products.map(p => `
+                <div class="bg-white rounded-lg shadow overflow-hidden flex flex-col">
+                    <img src="${p.img}" alt="${p.name}" class="w-full h-32 object-cover">
+                    <div class="p-3 flex flex-col flex-grow">
+                        <h3 class="text-sm font-semibold mb-1 leading-tight flex-grow">${p.name}</h3>
+                        <p class="text-brand font-bold text-sm mb-3">${formatRp(p.price)}</p>
+                        
+                        <div class="mt-auto">
+                            ${cart[p.id] ? `
+                                <div class="flex justify-between items-center bg-gray-100 rounded p-1">
+                                    <button onclick="updateCart(${p.id}, -1)" class="w-8 h-8 text-brand font-bold rounded hover:bg-gray-200">-</button>
+                                    <span class="text-sm font-bold">${cart[p.id].qty}</span>
+                                    <button onclick="updateCart(${p.id}, 1)" class="w-8 h-8 text-brand font-bold rounded hover:bg-gray-200">+</button>
+                                </div>
+                            ` : `
+                                <button onclick="updateCart(${p.id}, 1)" class="w-full bg-brand text-white text-sm py-2 rounded font-semibold transition hover:bg-opacity-90">Tambah</button>
+                            `}
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Fungsi menambah/mengurangi item di keranjang
+        function updateCart(id, change) {
+            const product = products.find(p => p.id === id);
+            if (!cart[id]) {
+                cart[id] = { ...product, qty: 0 };
+            }
+            
+            cart[id].qty += change;
+            if (cart[id].qty <= 0) {
+                delete cart[id];
+            }
+            
+            renderMenu();
+            updateBadge();
+            renderCartItems();
+        }
+
+        // Fungsi mengupdate angka merah di ikon keranjang
+        function updateBadge() {
+            const badge = document.getElementById('cart-badge');
+            const totalItems = Object.values(cart).reduce((sum, item) => sum + item.qty, 0);
+            if (totalItems > 0) {
+                badge.textContent = totalItems;
+                badge.classList.remove('hidden');
+            } else {
+                badge.classList.add('hidden');
+            }
+        }
+
+        // Fungsi membuka/menutup modal pesanan
+        function toggleCart() {
+            const modal = document.getElementById('cart-modal');
+            modal.classList.toggle('hidden');
+            modal.classList.toggle('flex');
+        }
+
+        // Fungsi mencetak daftar pesanan di dalam modal
+        function renderCartItems() {
+            const container = document.getElementById('cart-items');
+            const totalEl = document.getElementById('cart-total');
+            
+            let html = '';
+            let total = 0;
+
+            for (let id in cart) {
+                const item = cart[id];
+                const subtotal = item.price * item.qty;
+                total += subtotal;
+                
+                html += `
+                    <div class="flex justify-between items-center mb-3">
+                        <div class="flex-grow">
+                            <h4 class="text-sm font-bold">${item.name}</h4>
+                            <p class="text-xs text-gray-500">${formatRp(item.price)} x ${item.qty}</p>
+                        </div>
+                        <span class="text-sm font-bold">${formatRp(subtotal)}</span>
+                    </div>
+                `;
+            }
+
+            if (Object.keys(cart).length === 0) {
+                html = '<p class="text-gray-500 text-center py-4 text-sm">Keranjang masih kosong</p>';
+            }
+
+            container.innerHTML = html;
+            totalEl.textContent = formatRp(total);
+        }
+
+        // Fungsi memproses pesanan dan mengarahkan ke WhatsApp
+        function checkoutWA() {
+            const meja = document.getElementById('nomor-meja').value;
+            
+            if (Object.keys(cart).length === 0) {
+                alert('Keranjang Anda masih kosong!');
+                return;
+            }
+            if (!meja) {
+                alert('Mohon isi nomor meja Anda terlebih dahulu!');
+                document.getElementById('nomor-meja').focus();
+                toggleCart();
+                return;
+            }
+
+            // Menyusun format pesan WhatsApp
+            let text = `Halo Admin, saya mau pesan (Meja: ${meja})%0A%0A`;
+            let total = 0;
+
+            for (let id in cart) {
+                const item = cart[id];
+                const subtotal = item.price * item.qty;
+                total += subtotal;
+                // %0A adalah kode URL untuk Enter / Baris Baru
+                text += `- ${item.qty}x ${item.name} (Rp ${item.price.toLocaleString('id-ID')})%0A`;
+            }
+
+            text += `%0ATotal: *${formatRp(total)}*%0A%0ATerima kasih!`;
+
+            // === PENTING: UBAH NOMOR WA DI BAWAH INI ===
+            // Gunakan kode negara 62 tanpa tanda + atau angka 0 di depan.
+            // Saat presentasi ke klien, ubah ke nomor Anda sendiri sebagai simulasi kasir.
+            const noWA = "6281234567890"; 
+            
+            const url = `https://wa.me/${6285860647627}?text=${text}`;
+            window.open(url, '_blank');
+        }
+
+        // Panggil fungsi renderMenu saat pertama kali halaman dimuat
+        renderMenu();
+    </script>
+</body>
+</html>
